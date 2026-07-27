@@ -1,0 +1,116 @@
+@import "tailwindcss";
+
+:root {
+  --surface-0: #f9f9f7;
+  --surface-1: #ffffff;
+  --surface-2: #f2f1ed;
+  --ink-primary: #0b0b0b;
+  --ink-secondary: #52514e;
+  --ink-muted: #898781;
+  --border-hairline: rgba(11, 11, 11, 0.1);
+  --gridline: #e1e0d9;
+
+  --brand-blue: #2a78d6;
+  --brand-blue-strong: #184f95;
+  --brand-aqua: #1baf7a;
+  --brand-violet: #4a3aa7;
+  --brand-orange: #eb6834;
+
+  --status-good: #0ca30c;
+  --status-warning: #c98500;
+  --status-serious: #ec835a;
+  --status-critical: #d03b3b;
+
+  --font-display: "Geist", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --surface-0: #0d0d0d;
+    --surface-1: #161615;
+    --surface-2: #1e1e1c;
+    --ink-primary: #ffffff;
+    --ink-secondary: #c3c2b7;
+    --ink-muted: #898781;
+    --border-hairline: rgba(255, 255, 255, 0.1);
+    --gridline: #2c2c2a;
+
+    --brand-blue: #3987e5;
+    --brand-blue-strong: #6da7ec;
+    --brand-aqua: #199e70;
+    --brand-violet: #9085e9;
+    --brand-orange: #d95926;
+
+    --status-good: #0ca30c;
+    --status-warning: #fab219;
+    --status-serious: #ec835a;
+    --status-critical: #e66767;
+  }
+}
+
+:root[data-theme="dark"] {
+  --surface-0: #0d0d0d;
+  --surface-1: #161615;
+  --surface-2: #1e1e1c;
+  --ink-primary: #ffffff;
+  --ink-secondary: #c3c2b7;
+  --ink-muted: #898781;
+  --border-hairline: rgba(255, 255, 255, 0.1);
+  --gridline: #2c2c2a;
+
+  --brand-blue: #3987e5;
+  --brand-blue-strong: #6da7ec;
+  --brand-aqua: #199e70;
+  --brand-violet: #9085e9;
+  --brand-orange: #d95926;
+
+  --status-good: #0ca30c;
+  --status-warning: #fab219;
+  --status-serious: #ec835a;
+  --status-critical: #e66767;
+}
+
+* {
+  border-color: var(--border-hairline);
+}
+
+html {
+  color-scheme: light dark;
+}
+
+body {
+  background: var(--surface-0);
+  color: var(--ink-primary);
+  font-family: var(--font-sans), var(--font-display);
+}
+
+::selection {
+  background: var(--brand-blue);
+  color: white;
+}
+
+.bg-grid {
+  background-image:
+    linear-gradient(var(--gridline) 1px, transparent 1px),
+    linear-gradient(90deg, var(--gridline) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+@keyframes flow {
+  0% { stroke-dashoffset: 24; }
+  100% { stroke-dashoffset: 0; }
+}
+
+.flow-line {
+  stroke-dasharray: 6 6;
+  animation: flow 1.2s linear infinite;
+}
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-up {
+  animation: fade-up 0.5s ease-out both;
+}
