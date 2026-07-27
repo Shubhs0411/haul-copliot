@@ -6,7 +6,8 @@ import uuid
 from datetime import datetime
 from typing import Any, Annotated, Literal
 
-import anthropic
+from google import genai
+from google.genai import types
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import StateGraph, END
 from langgraph.graph.message import add_messages
@@ -24,7 +25,7 @@ from src.models.domain import QueryIntent
 from src.observability.tracer import get_tracer
 
 
-ROUTER_MODEL = os.getenv("AGENT_MODEL", "claude-sonnet-4-6")
+ROUTER_MODEL = os.getenv("AGENT_MODEL", "gemini-2.5-flash-lite")
 
 
 class FreightState(TypedDict):
@@ -66,7 +67,7 @@ class HaulCopilotOrchestrator:
     ]
 
     def __init__(self) -> None:
-        self._client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+        self._client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
         self._kb = FreightKnowledgeBase()
         self._kb.ingest()
 
@@ -144,10 +145,12 @@ class HaulCopilotOrchestrator:
     def _router_node(self, state: FreightState) -> FreightState:
         """Classify query intent using Claude with structured output."""
         query = state["query"]
-        response = self._client.messages.create(
+        response = self._client.models.generate_content(
             model=ROUTER_MODEL,
-            max_tokens=256,
-            system="""You are a query router for a transportation compliance system.
+            contents=[types.Content(role="user", parts=[types.Part(text=query)])],
+            config=types.GenerateContentConfig(
+                max_output_tokens=256,
+                system_instruction="""You are a query router for a transportation compliance system.
 Classify the user query into exactly one intent category.
 
 Categories:
@@ -159,9 +162,9 @@ Categories:
 - multi_domain: Query spans multiple categories
 
 Respond with ONLY the category name, nothing else.""",
-            messages=[{"role": "user", "content": query}],
+            ),
         )
-        intent_str = response.content[0].text.strip().lower()
+        intent_str = (response.text or "").strip().lower()
         intent_map = {
             "carrier_vetting": QueryIntent.CARRIER_VETTING,
             "driver_qualification": QueryIntent.DRIVER_QUALIFICATION,
@@ -268,10 +271,21 @@ Respond with ONLY the category name, nothing else.""",
 
     def _synthesizer_node(self, state: FreightState) -> FreightState:
         """Final polish pass — ensures response is actionable and well-structured."""
-        response = self._client.messages.create(
+        response = self._client.models.generate_content(
             model=ROUTER_MODEL,
-            max_tokens=1024,
-            system="""You are the final output formatter for HaulCopilot, a transportation compliance AI.
+            contents=[
+                types.Content(
+                    role="user",
+                    parts=[types.Part(text=(
+                        f"Original query: {state['query']}\n\n"
+                        f"Agent response:\n{state['agent_response']}\n\n"
+                        "Please format this response."
+                    ))],
+                )
+            ],
+            config=types.GenerateContentConfig(
+                max_output_tokens=1024,
+                system_instruction="""You are the final output formatter for HaulCopilot, a transportation compliance AI.
 
 Your job: Take the agent's response and ensure it is:
 1. Clearly structured (status → findings → recommendations)
@@ -280,14 +294,9 @@ Your job: Take the agent's response and ensure it is:
 4. Appropriately urgent — if something is CRITICAL, make that clear
 
 Do NOT add new information. Do NOT remove critical findings. Only improve clarity and structure.""",
-            messages=[
-                {
-                    "role": "user",
-                    "content": f"Original query: {state['query']}\n\nAgent response:\n{state['agent_response']}\n\nPlease format this response.",
-                }
-            ],
+            ),
         )
-        final_response = response.content[0].text
+        final_response = response.text or ""
         return {**state, "agent_response": final_response}
 
     def invoke(self, query: str) -> dict[str, Any]:
@@ -362,27 +371,29 @@ Do NOT add new information. Do NOT remove critical findings. Only improve clarit
         """
         base = self.invoke(query)
         response_text = base.get("response", "")
-        eval_resp = self._client.messages.create(
+        eval_resp = self._client.models.generate_content(
             model=ROUTER_MODEL,
-            max_tokens=1024,
-            system=(
-                "You are a strict compliance-response evaluator. "
-                "Assess if the response is clear, actionable, and grounded. "
-                "If good enough, return exactly: DECISION: KEEP\nREWRITE_RESPONSE: <original response>. "
-                "If weak, return exactly: DECISION: REWRITE\nREWRITE_RESPONSE: <improved response>."
-            ),
-            messages=[
-                {
-                    "role": "user",
-                    "content": (
+            contents=[
+                types.Content(
+                    role="user",
+                    parts=[types.Part(text=(
                         f"QUERY:\n{query}\n\n"
                         f"RESPONSE:\n{response_text}\n\n"
                         "Use status -> findings -> recommendations format."
-                    ),
-                }
+                    ))],
+                )
             ],
+            config=types.GenerateContentConfig(
+                max_output_tokens=1024,
+                system_instruction=(
+                    "You are a strict compliance-response evaluator. "
+                    "Assess if the response is clear, actionable, and grounded. "
+                    "If good enough, return exactly: DECISION: KEEP\nREWRITE_RESPONSE: <original response>. "
+                    "If weak, return exactly: DECISION: REWRITE\nREWRITE_RESPONSE: <improved response>."
+                ),
+            ),
         )
-        eval_text = eval_resp.content[0].text if eval_resp.content else ""
+        eval_text = eval_resp.text or ""
         decision = "KEEP" if "DECISION: KEEP" in eval_text else "REWRITE"
         marker = "REWRITE_RESPONSE:"
         if marker in eval_text:

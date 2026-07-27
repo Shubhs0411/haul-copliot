@@ -183,25 +183,25 @@ def _print_architecture():
 def _print_agents():
     agents = [
         Panel(
-            "[agent]ComplianceOracle[/agent]\n[dim]Model: claude-opus-4-7[/dim]\n\nRegulatory Q&A with full CFR citation. Semantic search over FMCSA/DOT knowledge base.",
+            "[agent]ComplianceOracle[/agent]\n[dim]Model: gemini-2.5-flash (ORACLE_MODEL)[/dim]\n\nRegulatory Q&A with full CFR citation. Semantic search over FMCSA/DOT knowledge base.",
             title="[bold]Regulation Oracle[/bold]",
             border_style="cyan",
             width=55,
         ),
         Panel(
-            "[agent]CarrierVetting[/agent]\n[dim]Model: claude-sonnet-4-6[/dim]\n\nOperating authority, insurance, CSA scores, crash history, OOS rates.",
+            "[agent]CarrierVetting[/agent]\n[dim]Model: gemini-2.5-flash-lite (AGENT_MODEL)[/dim]\n\nOperating authority, insurance, CSA scores, crash history, OOS rates.",
             title="[bold]Carrier Vetting[/bold]",
             border_style="cyan",
             width=55,
         ),
         Panel(
-            "[agent]DriverQualification[/agent]\n[dim]Model: claude-sonnet-4-6[/dim]\n\nCDL/medical cert validity, Clearinghouse status, DQ file completeness (49 CFR 391).",
+            "[agent]DriverQualification[/agent]\n[dim]Model: gemini-2.5-flash-lite (AGENT_MODEL)[/dim]\n\nCDL/medical cert validity, Clearinghouse status, DQ file completeness (49 CFR 391).",
             title="[bold]Driver Qual[/bold]",
             border_style="cyan",
             width=55,
         ),
         Panel(
-            "[agent]CSAScoring[/agent]\n[dim]Model: claude-sonnet-4-6[/dim]\n\nBASIC score interpretation, intervention thresholds, corrective action plans.",
+            "[agent]CSAScoring[/agent]\n[dim]Model: gemini-2.5-flash-lite (AGENT_MODEL)[/dim]\n\nBASIC score interpretation, intervention thresholds, corrective action plans.",
             title="[bold]CSA Scoring[/bold]",
             border_style="cyan",
             width=55,
@@ -253,9 +253,9 @@ def demo():
     _print_banner()
     _print_architecture()
 
-    api_key = os.getenv("ANTHROPIC_API_KEY")
+    api_key = os.getenv("GOOGLE_API_KEY")
     if not api_key:
-        console.print("[red]ERROR: ANTHROPIC_API_KEY not set. Copy .env.example to .env and add your key.[/red]")
+        console.print("[red]ERROR: GOOGLE_API_KEY not set. Copy .env.example to .env and add your key.[/red]")
         console.print("[dim]Without an API key, the demo runs in preview mode showing architecture only.[/dim]")
         _print_agents()
         return
@@ -307,7 +307,7 @@ def status():
     t.add_column("Detail", width=55)
 
     # API keys
-    api_key = os.getenv("ANTHROPIC_API_KEY", "")
+    api_key = os.getenv("GOOGLE_API_KEY", "")
     fmcsa_key = os.getenv("FMCSA_WEB_KEY", "")
     t.add_row(
         "Anthropic API Key",
@@ -459,7 +459,7 @@ def architecture(
 @app.command()
 def check(
     dot: str = typer.Option("2345678", help="Carrier DOT number for smoke checks"),
-    run_query: bool = typer.Option(False, "--run-query", help="Run one orchestrator query (requires ANTHROPIC_API_KEY)"),
+    run_query: bool = typer.Option(False, "--run-query", help="Run one orchestrator query (requires GOOGLE_API_KEY)"),
     strict: bool = typer.Option(False, "--strict", help="Exit non-zero if any check fails"),
 ):
     """Run end-to-end smoke checks for KB, graph, FMCSA, Docling, and text ingestion."""
@@ -469,8 +469,8 @@ def check(
     def _record(name: str, ok: bool, detail: str) -> None:
         checks.append((name, ok, detail))
 
-    api_key = os.getenv("ANTHROPIC_API_KEY", "")
-    _record("Anthropic API key", bool(api_key), "set" if api_key else "missing (.env: ANTHROPIC_API_KEY)")
+    api_key = os.getenv("GOOGLE_API_KEY", "")
+    _record("Google API key", bool(api_key), "set" if api_key else "missing (.env: GOOGLE_API_KEY)")
 
     try:
         from src.knowledge.vectorstore import FreightKnowledgeBase
@@ -532,7 +532,7 @@ def check(
 
     if run_query:
         if not api_key:
-            _record("Orchestrator query", False, "skipped: ANTHROPIC_API_KEY missing")
+            _record("Orchestrator query", False, "skipped: GOOGLE_API_KEY missing")
         else:
             try:
                 from src.graph.orchestrator import HaulCopilotOrchestrator
@@ -610,9 +610,9 @@ def eval(
 ):
     """Run the evaluation harness against the live system."""
     _print_banner()
-    api_key = (os.getenv("ANTHROPIC_API_KEY") or "").strip()
+    api_key = (os.getenv("GOOGLE_API_KEY") or "").strip()
     if not api_key:
-        console.print("[red]ANTHROPIC_API_KEY not set.[/red]")
+        console.print("[red]GOOGLE_API_KEY not set.[/red]")
         raise typer.Exit(1)
 
     from src.graph.orchestrator import HaulCopilotOrchestrator
@@ -629,7 +629,7 @@ def eval(
         orchestrator.invoke("Quick health check: respond with one sentence.")
     except Exception as e:
         console.print(f"[red]Eval preflight failed:[/red] {e}")
-        console.print("[yellow]Check ANTHROPIC_API_KEY and model access before running eval.[/yellow]")
+        console.print("[yellow]Check GOOGLE_API_KEY and model access before running eval.[/yellow]")
         raise typer.Exit(1)
 
     cat_filter = None
@@ -710,9 +710,9 @@ def eval(
 @app.command()
 def query(q: str = typer.Argument(..., help="Compliance question to ask")):
     """Run a single compliance query."""
-    api_key = os.getenv("ANTHROPIC_API_KEY")
+    api_key = os.getenv("GOOGLE_API_KEY")
     if not api_key:
-        console.print("[red]ANTHROPIC_API_KEY not set.[/red]")
+        console.print("[red]GOOGLE_API_KEY not set.[/red]")
         raise typer.Exit(1)
 
     from src.graph.orchestrator import HaulCopilotOrchestrator
@@ -730,9 +730,9 @@ def query(q: str = typer.Argument(..., help="Compliance question to ask")):
 def interactive():
     """Start an interactive compliance Q&A session."""
     _print_banner()
-    api_key = os.getenv("ANTHROPIC_API_KEY")
+    api_key = os.getenv("GOOGLE_API_KEY")
     if not api_key:
-        console.print("[red]ANTHROPIC_API_KEY not set. See .env.example.[/red]")
+        console.print("[red]GOOGLE_API_KEY not set. See .env.example.[/red]")
         raise typer.Exit(1)
 
     from src.graph.orchestrator import HaulCopilotOrchestrator

@@ -7,27 +7,41 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Any
 
-import anthropic
+from google import genai
+from google.genai import types
 
 from src.models.domain import AgentTrace, QueryIntent
 from src.observability.tracer import get_tracer
 
 
-AGENT_MODEL = os.getenv("AGENT_MODEL", "claude-sonnet-4-6")
-ORACLE_MODEL = os.getenv("ORACLE_MODEL", "claude-opus-4-7")
+AGENT_MODEL = os.getenv("AGENT_MODEL", "gemini-2.5-flash-lite")
+ORACLE_MODEL = os.getenv("ORACLE_MODEL", "gemini-2.5-flash")
+
+
+def _to_gemini_tool(tool: dict[str, Any]) -> types.Tool:
+    """Convert an Anthropic-style {name, description, input_schema} tool def to a Gemini FunctionDeclaration."""
+    return types.Tool(
+        function_declarations=[
+            types.FunctionDeclaration(
+                name=tool["name"],
+                description=tool.get("description", ""),
+                parameters=tool.get("input_schema"),
+            )
+        ]
+    )
 
 
 class BaseComplianceAgent(ABC):
     """
     Base class for all HaulCopilot compliance agents.
-    Handles tracing, token accounting, and structured tool-use loops with Claude.
+    Handles tracing, token accounting, and structured tool-use loops with Gemini.
     """
 
     name: str = "base"
     model: str = AGENT_MODEL
 
     def __init__(self) -> None:
-        self._client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+        self._client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
         self._tracer = get_tracer()
 
     @property
@@ -71,43 +85,50 @@ class BaseComplianceAgent(ABC):
         trace: AgentTrace,
         max_iterations: int = 10,
     ) -> dict[str, Any]:
-        messages: list[dict[str, Any]] = [{"role": "user", "content": query}]
+        contents: list[types.Content] = [
+            types.Content(role="user", parts=[types.Part(text=query)])
+        ]
+        gemini_tools = [_to_gemini_tool(t) for t in self.tools]
+        config = types.GenerateContentConfig(
+            system_instruction=self.system_prompt,
+            max_output_tokens=4096,
+            tools=gemini_tools,
+        )
 
         for _ in range(max_iterations):
-            response = self._client.messages.create(
+            response = self._client.models.generate_content(
                 model=self.model,
-                max_tokens=4096,
-                system=self.system_prompt,
-                tools=self.tools,
-                messages=messages,
+                contents=contents,
+                config=config,
             )
-            trace.input_tokens += response.usage.input_tokens
-            trace.output_tokens += response.usage.output_tokens
+            usage = response.usage_metadata
+            if usage:
+                trace.input_tokens += usage.prompt_token_count or 0
+                trace.output_tokens += usage.candidates_token_count or 0
 
-            if response.stop_reason == "end_turn":
-                text = next(
-                    (b.text for b in response.content if hasattr(b, "text")), ""
-                )
+            function_calls = response.function_calls or []
+
+            if not function_calls:
+                text = response.text or ""
                 return {"response": text, "trace": trace}
 
-            if response.stop_reason == "tool_use":
-                tool_results = []
-                for block in response.content:
-                    if block.type == "tool_use":
-                        trace.tools_called.append(block.name)
-                        result_str = self._dispatch_tool(block.name, block.input)
-                        trace.tool_results.append(
-                            {"tool": block.name, "input": block.input, "result": result_str[:500]}
-                        )
-                        tool_results.append(
-                            {
-                                "type": "tool_result",
-                                "tool_use_id": block.id,
-                                "content": result_str,
-                            }
-                        )
+            candidate_content = response.candidates[0].content
+            contents.append(candidate_content)
 
-                messages.append({"role": "assistant", "content": response.content})
-                messages.append({"role": "user", "content": tool_results})
+            function_response_parts = []
+            for call in function_calls:
+                trace.tools_called.append(call.name)
+                result_str = self._dispatch_tool(call.name, dict(call.args or {}))
+                trace.tool_results.append(
+                    {"tool": call.name, "input": call.args, "result": result_str[:500]}
+                )
+                function_response_parts.append(
+                    types.Part.from_function_response(
+                        name=call.name,
+                        response={"result": result_str},
+                    )
+                )
+
+            contents.append(types.Content(role="user", parts=function_response_parts))
 
         return {"response": "Max iterations reached", "trace": trace}

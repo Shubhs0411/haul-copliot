@@ -114,7 +114,7 @@ python3.11 -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
 cp .env.example .env
-# set ANTHROPIC_API_KEY in .env
+# set GOOGLE_API_KEY in .env
 ```
 
 ## UI Setup and Run

@@ -15,7 +15,7 @@ class ComplianceOracleAgent(BaseComplianceAgent):
     Combines:
       - ChromaDB semantic search (what do regulations say?)
       - Knowledge graph traversal (what has this entity actually done?)
-    Uses claude-opus-4-7 for reasoning over both sources.
+    Uses Gemini (ORACLE_MODEL) for reasoning over both sources.
     """
 
     name = "compliance_oracle"

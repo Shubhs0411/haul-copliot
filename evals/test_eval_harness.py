@@ -45,8 +45,8 @@ def test_live_eval_harness_meets_threshold():
     - EVAL_CATEGORY: optional QueryIntent value to filter suite
     - EVAL_N_CASES: optional int to limit cases
     """
-    if not os.getenv("ANTHROPIC_API_KEY"):
-        pytest.skip("ANTHROPIC_API_KEY is not set; skipping live eval integration test")
+    if not os.getenv("GOOGLE_API_KEY"):
+        pytest.skip("GOOGLE_API_KEY is not set; skipping live eval integration test")
 
     threshold = float(os.getenv("EVAL_MIN_PASS_RATE", "0.60"))
     cases = _selected_cases()
