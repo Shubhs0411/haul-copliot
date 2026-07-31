@@ -14,8 +14,8 @@ from src.models.domain import AgentTrace, QueryIntent
 from src.observability.tracer import get_tracer
 
 
-AGENT_MODEL = os.getenv("AGENT_MODEL", "gemini-2.5-flash-lite")
-ORACLE_MODEL = os.getenv("ORACLE_MODEL", "gemini-2.5-flash")
+AGENT_MODEL = os.getenv("AGENT_MODEL", "gemini-flash-lite-latest")
+ORACLE_MODEL = os.getenv("ORACLE_MODEL", "gemini-flash-latest")
 
 
 def _to_gemini_tool(tool: dict[str, Any]) -> types.Tool:

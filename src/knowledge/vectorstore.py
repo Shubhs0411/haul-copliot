@@ -7,13 +7,74 @@ from typing import Any
 
 import chromadb
 from chromadb.config import Settings
-from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
+from chromadb.utils.embedding_functions import EmbeddingFunction
+from google import genai
+from google.genai import types as genai_types
 
 from .regulations import RegulationLoader, RegulationChunk
 
 
 CHROMA_DIR = os.getenv("CHROMA_PERSIST_DIR", "./data/chroma")
-EMBED_MODEL = os.getenv("EMBED_MODEL", "all-MiniLM-L6-v2")
+EMBED_MODEL = os.getenv("EMBED_MODEL", "gemini-embedding-001")
+
+
+class GeminiEmbeddingFunction(EmbeddingFunction):
+    """
+    Chroma embedding function backed by the Gemini embeddings API.
+    Avoids loading a local sentence-transformers/torch model, which is too
+    heavy (500MB+ RAM) for small hosts like Render's free tier.
+    """
+
+    def __init__(self, model_name: str = EMBED_MODEL, api_key: str | None = None) -> None:
+        self.model_name = model_name
+        self._api_key = api_key
+        self._client: genai.Client | None = None
+
+    @property
+    def client(self) -> genai.Client:
+        # Lazy so constructing a FreightKnowledgeBase doesn't require GOOGLE_API_KEY
+        # unless an embedding call actually happens (e.g. in unit tests).
+        if self._client is None:
+            self._client = genai.Client(api_key=self._api_key or os.getenv("GOOGLE_API_KEY"))
+        return self._client
+
+    def __call__(self, input: list[str]) -> list[list[float]]:
+        return self._embed(list(input), task_type="RETRIEVAL_DOCUMENT")
+
+    def embed_query(self, input: list[str]) -> list[list[float]]:
+        return self._embed(list(input), task_type="RETRIEVAL_QUERY")
+
+    def _embed(self, texts: list[str], task_type: str) -> list[list[float]]:
+        response = self.client.models.embed_content(
+            model=self.model_name,
+            contents=texts,
+            config=genai_types.EmbedContentConfig(task_type=task_type),
+        )
+        return [e.values for e in response.embeddings]
+
+    @staticmethod
+    def name() -> str:
+        return "gemini"
+
+    def default_space(self) -> str:
+        return "cosine"
+
+    def supported_spaces(self) -> list[str]:
+        return ["cosine", "l2", "ip"]
+
+    @staticmethod
+    def build_from_config(config: dict[str, Any]) -> "GeminiEmbeddingFunction":
+        return GeminiEmbeddingFunction(model_name=config.get("model_name", EMBED_MODEL))
+
+    def get_config(self) -> dict[str, Any]:
+        return {"model_name": self.model_name}
+
+    def validate_config_update(self, old_config: dict[str, Any], new_config: dict[str, Any]) -> None:
+        return
+
+    @staticmethod
+    def validate_config(config: dict[str, Any]) -> None:
+        return
 
 
 class FreightKnowledgeBase:
@@ -30,7 +91,7 @@ class FreightKnowledgeBase:
             path=persist_dir,
             settings=Settings(anonymized_telemetry=False),
         )
-        embedding_fn = SentenceTransformerEmbeddingFunction(model_name=EMBED_MODEL)
+        embedding_fn = GeminiEmbeddingFunction(model_name=EMBED_MODEL)
         try:
             self._collection = self._client.get_or_create_collection(
                 name=self.COLLECTION_NAME,

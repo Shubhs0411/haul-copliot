@@ -25,7 +25,7 @@ from src.models.domain import QueryIntent
 from src.observability.tracer import get_tracer
 
 
-ROUTER_MODEL = os.getenv("AGENT_MODEL", "gemini-2.5-flash-lite")
+ROUTER_MODEL = os.getenv("AGENT_MODEL", "gemini-flash-lite-latest")
 
 
 class FreightState(TypedDict):

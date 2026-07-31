@@ -158,7 +158,7 @@ def _print_architecture():
     )
     table.add_row(
         "System of Velocity",
-        "LangGraph + 4 Claude Agents",
+        "LangGraph + 4 Gemini Agents",
         "Router → specialist agents → synthesizer. Ship in a day, change tomorrow.",
     )
     table.add_row(
@@ -183,25 +183,25 @@ def _print_architecture():
 def _print_agents():
     agents = [
         Panel(
-            "[agent]ComplianceOracle[/agent]\n[dim]Model: gemini-2.5-flash (ORACLE_MODEL)[/dim]\n\nRegulatory Q&A with full CFR citation. Semantic search over FMCSA/DOT knowledge base.",
+            "[agent]ComplianceOracle[/agent]\n[dim]Model: gemini-flash-latest (ORACLE_MODEL)[/dim]\n\nRegulatory Q&A with full CFR citation. Semantic search over FMCSA/DOT knowledge base.",
             title="[bold]Regulation Oracle[/bold]",
             border_style="cyan",
             width=55,
         ),
         Panel(
-            "[agent]CarrierVetting[/agent]\n[dim]Model: gemini-2.5-flash-lite (AGENT_MODEL)[/dim]\n\nOperating authority, insurance, CSA scores, crash history, OOS rates.",
+            "[agent]CarrierVetting[/agent]\n[dim]Model: gemini-flash-lite-latest (AGENT_MODEL)[/dim]\n\nOperating authority, insurance, CSA scores, crash history, OOS rates.",
             title="[bold]Carrier Vetting[/bold]",
             border_style="cyan",
             width=55,
         ),
         Panel(
-            "[agent]DriverQualification[/agent]\n[dim]Model: gemini-2.5-flash-lite (AGENT_MODEL)[/dim]\n\nCDL/medical cert validity, Clearinghouse status, DQ file completeness (49 CFR 391).",
+            "[agent]DriverQualification[/agent]\n[dim]Model: gemini-flash-lite-latest (AGENT_MODEL)[/dim]\n\nCDL/medical cert validity, Clearinghouse status, DQ file completeness (49 CFR 391).",
             title="[bold]Driver Qual[/bold]",
             border_style="cyan",
             width=55,
         ),
         Panel(
-            "[agent]CSAScoring[/agent]\n[dim]Model: gemini-2.5-flash-lite (AGENT_MODEL)[/dim]\n\nBASIC score interpretation, intervention thresholds, corrective action plans.",
+            "[agent]CSAScoring[/agent]\n[dim]Model: gemini-flash-lite-latest (AGENT_MODEL)[/dim]\n\nBASIC score interpretation, intervention thresholds, corrective action plans.",
             title="[bold]CSA Scoring[/bold]",
             border_style="cyan",
             width=55,

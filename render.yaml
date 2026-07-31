@@ -17,9 +17,9 @@ services:
       - key: FMCSA_WEB_KEY
         sync: false
       - key: ORACLE_MODEL
-        value: gemini-2.5-flash
+        value: gemini-flash-latest
       - key: AGENT_MODEL
-        value: gemini-2.5-flash-lite
+        value: gemini-flash-lite-latest
       - key: CHROMA_PERSIST_DIR
         value: /opt/render/project/src/data/chroma
       - key: API_HOST
